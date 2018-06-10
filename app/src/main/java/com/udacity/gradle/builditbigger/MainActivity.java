@@ -4,14 +4,15 @@ import android.content.Context;
 import android.content.Intent;
 import android.os.AsyncTask;
 import android.os.Bundle;
+import android.support.annotation.NonNull;
+import android.support.annotation.Nullable;
+import android.support.annotation.VisibleForTesting;
 import android.support.v4.util.Pair;
 import android.support.v7.app.AppCompatActivity;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
-import android.widget.Toast;
 
-import com.example.android.jokestore.JokeFactory;
 import com.example.android.jokeware.JokeActivity;
 import com.google.api.client.extensions.android.http.AndroidHttp;
 import com.google.api.client.extensions.android.json.AndroidJsonFactory;
@@ -21,16 +22,31 @@ import com.udacity.gradle.builditbigger.backend.myApi.MyApi;
 
 import java.io.IOException;
 
+import static com.udacity.gradle.builditbigger.MainActivity.JOKE_KEY;
+
 
 public class MainActivity extends AppCompatActivity {
 
-    private static final String JOKE_KEY = "joke";
+    public static final String JOKE_KEY = "joke";
+
+    @Nullable
+    private SimpleIdlingResource mIdlingResource;
+
+    @NonNull
+    @VisibleForTesting
+    public SimpleIdlingResource getIdlingInstance() {
+        if (mIdlingResource == null) {
+            mIdlingResource = new SimpleIdlingResource();
+        }
+        return mIdlingResource;
+    }
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
-        new EndpointsAsyncTask().execute(new Pair<Context, String>(this, "Manfred"));
+
+        getIdlingInstance();
     }
 
 
@@ -57,20 +73,19 @@ public class MainActivity extends AppCompatActivity {
     }
 
     public void tellJoke(View view) {
-        Intent jokeActivityLaunchIntent = new Intent(MainActivity.this, JokeActivity.class);
-        jokeActivityLaunchIntent.putExtra(JOKE_KEY, JokeFactory.generateJoke());
-        startActivity(jokeActivityLaunchIntent);
+        new EndpointsAsyncTask().execute(new Pair<Context, SimpleIdlingResource>(this, mIdlingResource));
     }
 
 
 }
 
-class EndpointsAsyncTask extends AsyncTask<Pair<Context, String>, Void, String> {
+class EndpointsAsyncTask extends AsyncTask<Pair<Context, SimpleIdlingResource>, Void, String> {
     private static MyApi myApiService = null;
+    private SimpleIdlingResource mIdlingResource;
     private Context context;
 
     @Override
-    protected String doInBackground(Pair<Context, String>... params) {
+    protected String doInBackground(Pair<Context, SimpleIdlingResource>... params) {
         if(myApiService == null) {  // Only do this once
             MyApi.Builder builder = new MyApi.Builder(AndroidHttp.newCompatibleTransport(),
                     new AndroidJsonFactory(), null)
@@ -90,10 +105,10 @@ class EndpointsAsyncTask extends AsyncTask<Pair<Context, String>, Void, String> 
         }
 
         context = params[0].first;
-        String name = params[0].second;
+        mIdlingResource = params[0].second;
 
         try {
-            return myApiService.sayHi(name).execute().getData();
+            return myApiService.fetchJoke().execute().getData();
         } catch (IOException e) {
             return e.getMessage();
         }
@@ -101,6 +116,11 @@ class EndpointsAsyncTask extends AsyncTask<Pair<Context, String>, Void, String> 
 
     @Override
     protected void onPostExecute(String result) {
-        Toast.makeText(context, result, Toast.LENGTH_LONG).show();
+        Intent jokeActivityLaunchIntent = new Intent(context, JokeActivity.class);
+        jokeActivityLaunchIntent.putExtra(JOKE_KEY, result);
+        context.startActivity(jokeActivityLaunchIntent);
+        if (mIdlingResource != null) {
+            mIdlingResource.setIdleState(true);
+        }
     }
 }
