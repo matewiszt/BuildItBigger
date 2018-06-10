@@ -7,11 +7,12 @@ import android.os.Bundle;
 import android.support.annotation.NonNull;
 import android.support.annotation.Nullable;
 import android.support.annotation.VisibleForTesting;
-import android.support.v4.util.Pair;
 import android.support.v7.app.AppCompatActivity;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
+import android.widget.LinearLayout;
+import android.widget.ProgressBar;
 
 import com.example.android.jokeware.JokeActivity;
 import com.google.api.client.extensions.android.http.AndroidHttp;
@@ -22,12 +23,13 @@ import com.udacity.gradle.builditbigger.backend.myApi.MyApi;
 
 import java.io.IOException;
 
-import static com.udacity.gradle.builditbigger.MainActivity.JOKE_KEY;
 
-
-public class MainActivity extends AppCompatActivity {
+public class MainActivity extends AppCompatActivity implements EndpointsAsyncTask.JokeFetchedListener {
 
     public static final String JOKE_KEY = "joke";
+
+    private LinearLayout mContentLayout;
+    private ProgressBar mProgressBar;
 
     @Nullable
     private SimpleIdlingResource mIdlingResource;
@@ -45,6 +47,8 @@ public class MainActivity extends AppCompatActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
+        mContentLayout = (LinearLayout) findViewById(R.id.content_layout);
+        mProgressBar = (ProgressBar) findViewById(R.id.progress_bar);
 
         getIdlingInstance();
     }
@@ -73,19 +77,40 @@ public class MainActivity extends AppCompatActivity {
     }
 
     public void tellJoke(View view) {
-        new EndpointsAsyncTask().execute(new Pair<Context, SimpleIdlingResource>(this, mIdlingResource));
+        mContentLayout.setVisibility(View.INVISIBLE);
+        mProgressBar.setVisibility(View.VISIBLE);
+        new EndpointsAsyncTask(this).execute(this);
     }
 
-
+    @Override
+    public void onJokeFetched(String joke) {
+        mContentLayout.setVisibility(View.VISIBLE);
+        mProgressBar.setVisibility(View.INVISIBLE);
+        Intent jokeActivityLaunchIntent = new Intent(this, JokeActivity.class);
+        jokeActivityLaunchIntent.putExtra(JOKE_KEY, joke);
+        startActivity(jokeActivityLaunchIntent);
+        if (mIdlingResource != null) {
+            mIdlingResource.setIdleState(true);
+        }
+    }
 }
 
-class EndpointsAsyncTask extends AsyncTask<Pair<Context, SimpleIdlingResource>, Void, String> {
+class EndpointsAsyncTask extends AsyncTask<Context, Void, String> {
     private static MyApi myApiService = null;
-    private SimpleIdlingResource mIdlingResource;
     private Context context;
+    private JokeFetchedListener mListener;
+
+
+    public interface JokeFetchedListener {
+        void onJokeFetched(String joke);
+    }
+
+    public EndpointsAsyncTask(JokeFetchedListener listener) {
+        mListener = listener;
+    }
 
     @Override
-    protected String doInBackground(Pair<Context, SimpleIdlingResource>... params) {
+    protected String doInBackground(Context... params) {
         if(myApiService == null) {  // Only do this once
             MyApi.Builder builder = new MyApi.Builder(AndroidHttp.newCompatibleTransport(),
                     new AndroidJsonFactory(), null)
@@ -104,8 +129,7 @@ class EndpointsAsyncTask extends AsyncTask<Pair<Context, SimpleIdlingResource>, 
             myApiService = builder.build();
         }
 
-        context = params[0].first;
-        mIdlingResource = params[0].second;
+        context = params[0];
 
         try {
             return myApiService.fetchJoke().execute().getData();
@@ -116,11 +140,6 @@ class EndpointsAsyncTask extends AsyncTask<Pair<Context, SimpleIdlingResource>, 
 
     @Override
     protected void onPostExecute(String result) {
-        Intent jokeActivityLaunchIntent = new Intent(context, JokeActivity.class);
-        jokeActivityLaunchIntent.putExtra(JOKE_KEY, result);
-        context.startActivity(jokeActivityLaunchIntent);
-        if (mIdlingResource != null) {
-            mIdlingResource.setIdleState(true);
-        }
+        mListener.onJokeFetched(result);
     }
 }
