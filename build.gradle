@@ -23,6 +23,13 @@ allprojects {
 
 task runTests() {
     dependsOn ':backend:appengineStart'
-    mustRunAfter ':app:connectedAndroidTest'
+    dependsOn 'runAppConnectedAndroidTest'
     finalizedBy ':backend:appengineStop'
+}
+
+task runAppConnectedAndroidTest(dependsOn: ':app:connectedAndroidTest') {
+    mustRunAfter ':backend:appengineStart'
+    doLast {
+        println "Test completed."
+    }
 }

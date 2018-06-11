@@ -17,7 +17,6 @@ import com.google.android.gms.ads.InterstitialAd;
  */
 public class MainActivityFragment extends Fragment {
 
-    private static final String INTERSTITIAL_UNIT_ID = "ca-app-pub-3940256099942544/1033173712";
     private InterstitialAd mInterstitialAd;
     private Context mContext;
 
@@ -38,7 +37,7 @@ public class MainActivityFragment extends Fragment {
         View root = inflater.inflate(R.layout.fragment_main, container, false);
 
         mInterstitialAd = new InterstitialAd(mContext);
-        mInterstitialAd.setAdUnitId(INTERSTITIAL_UNIT_ID);
+        mInterstitialAd.setAdUnitId(mContext.getString(R.string.interstitial_ad_unit_id));
         mInterstitialAd.loadAd(new AdRequest.Builder().addTestDevice(AdRequest.DEVICE_ID_EMULATOR).build());
         mInterstitialAd.setAdListener(new AdListener() {
             @Override

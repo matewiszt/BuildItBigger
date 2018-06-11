@@ -1,16 +1,21 @@
 package com.udacity.gradle.builditbigger;
 
+import android.support.test.InstrumentationRegistry;
 import android.support.test.espresso.IdlingRegistry;
 import android.support.test.rule.ActivityTestRule;
 import android.support.test.runner.AndroidJUnit4;
 
 import com.example.android.jokestore.JokeFactory;
 
+import junit.framework.Assert;
+
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.runner.RunWith;
+
+import java.util.concurrent.CountDownLatch;
 
 import static android.support.test.espresso.Espresso.onView;
 import static android.support.test.espresso.action.ViewActions.click;
@@ -22,6 +27,7 @@ import static android.support.test.espresso.matcher.ViewMatchers.withText;
 public class MainActivityTest {
 
     private SimpleIdlingResource mIdlingResource;
+    private String myJoke;
 
     @Rule
     public ActivityTestRule<MainActivity> mActivityTestRule = new ActivityTestRule<>(MainActivity.class);
@@ -36,6 +42,25 @@ public class MainActivityTest {
     public void clickTellJokeButton_displaysJoke() {
         onView(withId(R.id.tellJoke_button)).perform(click());
         onView(withId(R.id.joke_tv)).check(matches(withText(JokeFactory.generateJoke())));
+    }
+
+    @Test
+    public void testBackend() {
+        final CountDownLatch signal = new CountDownLatch(1);
+        EndpointsAsyncTask task = new EndpointsAsyncTask(new EndpointsAsyncTask.JokeFetchedListener() {
+            @Override
+            public void onJokeFetched(String joke) {
+                myJoke = joke;
+                signal.countDown();
+            }
+        });
+        task.execute(InstrumentationRegistry.getTargetContext());
+        try {
+            signal.await();// wait for callback
+            Assert.assertEquals(JokeFactory.generateJoke(), myJoke);
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
     }
 
     @After
